@@ -9,47 +9,57 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 contract StableCoin is ERC20, ERC20Burnable, Ownable {
     //<----------------------------state variable---------------------------->
     //<----------------------------events---------------------------->
+    event TokenMinted(address indexed minter, uint256 quantity);
+    event TokenBurned(address indexed burner, uint256 quantity);
     //<----------------------------custom errors---------------------------->
     error StableCoin__NotZeroAddress();
-    error StableCoin__NotZeroAmount();
+    error StableCoin__NotZeroQuantity();
     error StableCoin__NotZeroBalance();
+    error StableCoin__BurnQuantityExceedsBalance(
+        uint256 quantity,
+        uint256 balance
+    );
 
     //<----------------------------modifiers---------------------------->
 
     //<----------------------------functions---------------------------->
     //<----------------------------constructor---------------------------->
-    constructor(
-        address initialOwner
-    ) ERC20("StableCoin", "SC") Ownable(initialOwner) {}
+    constructor() ERC20("StableCoin", "SC") Ownable(msg.sender) {}
 
     //<----------------------------external functions---------------------------->
     //<----------------------------public functions---------------------------->
     function mint(
         address to,
-        uint256 amount
+        uint256 quantity
     ) public onlyOwner returns (bool isSuccess) {
         if (to == address(0)) {
             revert StableCoin__NotZeroAddress();
         }
-        if (amount == 0) {
-            revert StableCoin__NotZeroAmount();
+        if (quantity == 0) {
+            revert StableCoin__NotZeroQuantity();
         }
-        _mint(to, amount);
+        _mint(to, quantity);
+        emit TokenMinted(to, quantity);
         isSuccess = true;
+
         return isSuccess;
     }
 
-    function burn(uint256 amount) public override onlyOwner {
-        if (amount == 0) {
-            revert StableCoin__NotZeroAmount();
+    function burn(uint256 quantity) public override onlyOwner {
+        if (quantity == 0) {
+            revert StableCoin__NotZeroQuantity();
         }
         uint256 balance = balanceOf(msg.sender);
-        if (balance == 0) {
-            revert StableCoin__NotZeroBalance();
+        if (balance < quantity) {
+            revert StableCoin__BurnQuantityExceedsBalance(quantity, balance);
         }
-        super.burn(amount);
+        super.burn(quantity);
+
+        emit TokenBurned(msg.sender, quantity);
     }
     //<----------------------------external/public view/pure functions---------------------------->
+    //<----------------------------internal functions---------------------------->
+    //<----------------------------internal view/pure functions---------------------------->
     //<----------------------------private functions---------------------------->
     //<----------------------------private view/pure functions---------------------------->
 }
