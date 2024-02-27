@@ -9,6 +9,9 @@ import {StableCoin} from "../../src/StableCoin.sol";
 import {DeploySCEngine} from "../../script/deploy/DeploySCEngine.s.sol";
 import {HelperConfig} from "../../script/deploy/HelperConfig.s.sol";
 import {VRFCoordinatorV2Mock} from "../../lib/chainlink-brownie-contracts/contracts/src/v0.8/mocks/VRFCoordinatorV2Mock.sol";
+import {ERC20Mock} from "@openzeppelin/contracts/mocks/token/ERC20Mock.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {MockPriceConverter} from "../../script/deploy/mocks/src/MockPriceConverter.sol";
 
 contract SCEngineTest is Test, Script {
     //NOTE we use e and a prefix many time this
@@ -17,6 +20,19 @@ contract SCEngineTest is Test, Script {
     SCEngine scEngine;
     StableCoin stableCoin;
     HelperConfig helperConfig;
+    MockPriceConverter mockPriceConverter;
+
+    uint256 private constant LIQUIDATION_THRESHOLD = 50; // This means you need to be 200% over-collateralized
+    uint256 private constant LIQUIDATION_PRECISION = 100;
+    uint256 private constant MIN_HEALTH_FACTOR = 1e18;
+    uint256 private constant PRECISION = 1e18;
+    uint256 private constant QUANTITY_TO_DEPOSIT = 500 * PRECISION;
+    uint256 private constant QUANTITY_TO_MINT = 100 * PRECISION;
+    address[] s_tokens;
+    address[] s_priceFeeds;
+    address s_stableCoin;
+    mapping(address token => address priceFeed) s_tokenPriceFeed;
+
     //
     //
     //
@@ -24,7 +40,7 @@ contract SCEngineTest is Test, Script {
     uint256 deployerKey;
     uint256 USERS_START_BALANCE = 10 ether;
     uint256 private constant OWNER_INDEX = 0;
-    address[10] public players = [
+    address[10] public users = [
         address(1),
         address(2),
         address(3),
@@ -38,11 +54,21 @@ contract SCEngineTest is Test, Script {
     ];
 
     //<-----------------------------event--------------------------->
-
+    event CollataralDeposited(
+        address indexed depositer,
+        address indexed tokenCollateralAddress,
+        uint256 quantity
+    );
     //<---------------------------------------modifier------------------------------------------>
 
-    modifier skipFork() {
+    modifier skipForkChains() {
         if (block.chainid != 31337) {
+            return;
+        }
+        _;
+    }
+    modifier skipLocalChains() {
+        if (block.chainid == 31337) {
             return;
         }
         _;
@@ -51,22 +77,104 @@ contract SCEngineTest is Test, Script {
     //<---------------------------------------setUp------------------------------------------>
     function setUp() external {
         DeploySCEngine deploySCEngine = new DeploySCEngine();
-        (scEngine, stableCoin, helperConfig) = deploySCEngine.run();
+        (
+            scEngine,
+            stableCoin,
+            helperConfig,
+            mockPriceConverter
+        ) = deploySCEngine.run();
 
         fundUsersAccount();
+        setValues();
     }
 
     //<---------------------------------------helper functions------------------------------------------>
     function fundUsersAccount() private {
-        uint256 playersLength = players.length;
-        for (
-            uint8 playerIndex = 0;
-            playerIndex < playersLength;
-            playerIndex++
-        ) {
-            address player = players[playerIndex];
-            vm.deal(player, USERS_START_BALANCE);
+        uint256 usersLength = users.length;
+        for (uint8 userIndex = 0; userIndex < usersLength; userIndex++) {
+            address user = users[userIndex];
+            vm.deal(user, USERS_START_BALANCE);
         }
+    }
+
+    function setValues() public {
+        (s_tokens, s_priceFeeds, ) = helperConfig.getActiveNetworkConfig();
+        s_stableCoin = address(stableCoin);
+    }
+
+    function mintAndApproveTokens(
+        address token,
+        address to,
+        uint256 quantity
+    ) public {
+        deal(token, to, quantity, false);
+        IERC20(token).approve(address(scEngine), quantity);
+    }
+
+    function mintScMultiple() public {
+        for (uint256 userIndex = 0; userIndex < users.length; userIndex++) {
+            address minter = users[userIndex];
+            mintScSingle(minter);
+        }
+    }
+
+    function mintScSingle(address minter) public {
+        uint256 quantity = QUANTITY_TO_MINT;
+        uint256 userBalance = scEngine.getMinterMintBalance(minter);
+        uint256 userExpectedBalance = userBalance + quantity;
+
+        uint256 contractBalance = IERC20(stableCoin).balanceOf(address(minter));
+        uint256 contractExpectedBalance = contractBalance + quantity;
+
+        vm.prank(minter);
+        scEngine.mintSc(quantity);
+
+        uint256 userActualBalance = scEngine.getMinterMintBalance(minter);
+        uint256 contractActualBalance = IERC20(stableCoin).balanceOf(
+            address(minter)
+        );
+        assert(userExpectedBalance == userActualBalance);
+        assert(contractExpectedBalance == contractActualBalance);
+    }
+
+    function depositCollateralMultiple() public {
+        for (uint256 userIndex = 0; userIndex < users.length; userIndex++) {
+            for (
+                uint256 tokenIndex = 0;
+                tokenIndex < s_tokens.length;
+                tokenIndex++
+            ) {
+                address depositer = users[userIndex];
+                address token = s_tokens[tokenIndex];
+                depositCollateralSingle(depositer, token);
+            }
+        }
+    }
+
+    function depositCollateralSingle(address depositer, address token) public {
+        uint256 quantity = QUANTITY_TO_DEPOSIT;
+        uint256 userBalance = scEngine.getDepositerCollateralBalance(
+            depositer,
+            token
+        );
+        uint256 userPreviousBalance = userBalance + quantity;
+        uint256 contractBalance = IERC20(token).balanceOf(address(scEngine));
+        uint256 contractPreviousEBalance = contractBalance + quantity;
+        vm.startPrank(depositer);
+        mintAndApproveTokens(token, depositer, quantity);
+        //test event
+        vm.expectEmit(true, true, false, false, address(scEngine));
+        emit CollataralDeposited(depositer, token, quantity);
+        scEngine.depositCollataral(token, quantity);
+        vm.stopPrank();
+
+        uint256 userNewBalance = scEngine.getDepositerCollateralBalance(
+            depositer,
+            token
+        );
+        uint256 contractNewBalance = IERC20(token).balanceOf(address(scEngine));
+        assert(userNewBalance == userPreviousBalance);
+        assert(contractNewBalance == contractPreviousEBalance);
     }
 
     //<---------------------------------------test------------------------------------------>
@@ -78,7 +186,7 @@ contract SCEngineTest is Test, Script {
         address[] memory _priceFeed;
         address _stableCoin;
         vm.expectRevert(SCEngine.SCEngine__ZeroValue.selector);
-        SCEngine _SCEngine = new SCEngine(_tokens, _priceFeed, _stableCoin);
+        new SCEngine(_tokens, _priceFeed, _stableCoin);
     }
 
     function testConstructorShouldRevertIfDifferentSizeAddressPassed()
@@ -97,55 +205,175 @@ contract SCEngineTest is Test, Script {
                 _priceFeeds.length
             )
         );
-        SCEngine _SCEngine = new SCEngine(_tokens, _priceFeeds, _stableCoin);
+        new SCEngine(_tokens, _priceFeeds, _stableCoin);
     }
 
     function testConstructorShouldRevertIfStableCoinAddressZero() external {
-        address[] memory _tokens;
-        address[] memory _priceFeeds;
         address _stableCoin = address(0);
-        (_tokens, _priceFeeds, ) = helperConfig.getActiveNetworkConfig();
 
         vm.expectRevert(SCEngine.SCEngine__ZeroAddress.selector);
-        SCEngine _SCEngine = new SCEngine(_tokens, _priceFeeds, _stableCoin);
+        new SCEngine(s_tokens, s_priceFeeds, _stableCoin);
     }
 
-    function testConstructorIsStableCoinSetProperly() external {
-        assert(address(stableCoin) == scEngine.getStableCoin());
+    function testConstructorIsStableCoinSetProperly() external view {
+        assert(s_stableCoin == scEngine.getStableCoin());
     }
 
-    function testConstructorIsTokenAndPriceFeedSetProperly() external {
-        address[] memory eTokens;
-        address[] memory ePriceFeeds;
-        (eTokens, ePriceFeeds, ) = helperConfig.getActiveNetworkConfig();
+    function testConstructorIsTokenAndPriceFeedSetProperly() external view {
         address[] memory aTokens = scEngine.getTokens();
-        console.log(aTokens.length);
-        for (uint256 index = 0; index < eTokens.length; index++) {
-            assert(eTokens[index] == aTokens[index]);
-            assert(ePriceFeeds[index] == scEngine.getPriceFeed(aTokens[index]));
+        for (uint256 index = 0; index < s_tokens.length; index++) {
+            assert(s_tokens[index] == aTokens[index]);
+            assert(
+                s_priceFeeds[index] == scEngine.getPriceFeed(aTokens[index])
+            );
         }
-        assert(aTokens.length == eTokens.length);
+        assert(s_tokens.length == aTokens.length);
     }
 
     ////////////////////////////
     ///////Constant////////////
     //////////////////////////
 
-    ///////////////////////////
-    //////enterRaffle/////////
-    //////////////////////////
-    ////////////////////////////
-    //fallbacek and receive////
-    //////////////////////////
+    function testConstant() external view {
+        assert(LIQUIDATION_THRESHOLD == scEngine.getLiquidationThreshold());
+        assert(LIQUIDATION_PRECISION == scEngine.getLiquidationPrecision());
+        assert(MIN_HEALTH_FACTOR == scEngine.getMinimumHealthFactor());
+        assert(PRECISION == scEngine.getPrecision());
+    }
+
+    ////////////////////////////////
+    //////depositCollataral////////
+    ///////////////////////////////
+    function testShouldRevertDepositCollataralIfTokenNotListed() external {
+        address _token = address(scEngine);
+        //this is the SCEngine address not the token address
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                SCEngine.SCEngine__TokenNotListed.selector,
+                _token
+            )
+        );
+        scEngine.depositCollataral(_token, QUANTITY_TO_DEPOSIT);
+    }
+
+    function testShouldRevertDepositCollataralIfQuantityIsZero() external {
+        vm.expectRevert(SCEngine.SCEngine__ZeroValue.selector);
+        scEngine.depositCollataral(s_tokens[0], 0);
+    }
+
+    function testShouldRevertDepositCollataralIfTransferFromFailed() external {
+        vm.expectRevert();
+        scEngine.depositCollataral(s_tokens[0], QUANTITY_TO_DEPOSIT);
+    }
+
+    function testDepositCollataral() external {
+        depositCollateralMultiple();
+    }
 
     ////////////////////////////
-    //////checkUpkeep//////////
+    ///////////mintSc//////////
     //////////////////////////
+    function testShouldRevertMintScIfHealthFactorIsBroken() public {
+        uint256 quantity = QUANTITY_TO_DEPOSIT;
+        address user = users[0];
+        uint256 expectedUserHealthFactor = 0;
+        vm.prank(user);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                SCEngine.SCEngine__BreaksHealthFactor.selector,
+                expectedUserHealthFactor
+            )
+        );
+        scEngine.mintSc(quantity);
+    }
+
+    function testMintSc() public {
+        depositCollateralMultiple();
+        mintScMultiple();
+    }
+
+    //////////////////////////////////////////////////
+    ///////////Deposit Collateral And MintSc//////////
+    /////////////////////////////////////////////////
+    function testDepositAndMint() external {
+        for (uint256 userIndex = 0; userIndex < users.length; userIndex++) {
+            address depositer = users[userIndex];
+            for (
+                uint256 tokenIndex = 0;
+                tokenIndex < s_tokens.length;
+                tokenIndex++
+            ) {
+                address token = s_tokens[tokenIndex];
+                vm.startPrank(depositer);
+                mintAndApproveTokens(token, depositer, QUANTITY_TO_DEPOSIT);
+                scEngine.depositCollataralAndMintSc(
+                    token,
+                    QUANTITY_TO_DEPOSIT,
+                    QUANTITY_TO_MINT
+                );
+                vm.stopPrank();
+            }
+        }
+    }
+
+    ////////////////////////////////
+    /////////HealthFactor//////////
+    ///////////////////////////////
+    function testUserHealthFactorWhenNoDepoistAndMintSc() public view {
+        address user = users[0];
+        uint256 userHealthFactor = scEngine.getUserHealthFactor(user);
+        assert(userHealthFactor == type(uint256).max);
+    }
+
+    function testUserHealthFactorWhenNoMintSc() public {
+        address user = users[0];
+        address token = s_tokens[0];
+        depositCollateralSingle(user, token);
+        uint256 userHealthFactor = scEngine.getUserHealthFactor(user);
+        assert(userHealthFactor == type(uint256).max);
+    }
+
+    function testUserHealthFactorWhenDepoistAndMintSc() public {
+        depositCollateralMultiple();
+        mintScMultiple();
+        uint256 userHealthFactor = scEngine.getUserHealthFactor(address(1));
+        uint256 usersLength = users.length;
+        for (uint8 userIndex = 0; userIndex < usersLength; userIndex++) {
+            address user = users[userIndex];
+            (uint256 totalScMinted, uint256 collateralValueInUsd) = scEngine
+                .getAccountInformation(user);
+            uint256 expectedUserHealthFactor = scEngine
+                .calculateUserHealthFactor(totalScMinted, collateralValueInUsd);
+            uint256 actualUserHealthFactor = scEngine.getUserHealthFactor(user);
+
+            assert(expectedUserHealthFactor == actualUserHealthFactor);
+        }
+    }
 
     ////////////////////////////
-    //////performUpkeep////////
+    //////Price////////////////
     //////////////////////////
+    function testGetPrice() public view {
+        for (uint256 index = 0; index < s_priceFeeds.length; index++) {
+            address priceFeed = s_priceFeeds[index];
+            uint256 expectedPrice = mockPriceConverter.getPrice(priceFeed);
+            uint256 actualPrice = scEngine.getPrice(priceFeed);
+            assert(expectedPrice == actualPrice);
+        }
+    }
 
+    function testGetTotalAmount() public view {
+        uint256 quantity = QUANTITY_TO_DEPOSIT;
+        for (uint256 index = 0; index < s_priceFeeds.length; index++) {
+            address priceFeed = s_priceFeeds[index];
+            uint256 expectedPrice = mockPriceConverter.getTotalAmount(
+                priceFeed,
+                quantity
+            );
+            uint256 actualPrice = scEngine.getTotalAmount(priceFeed, quantity);
+            assert(expectedPrice == actualPrice);
+        }
+    }
     ////////////////////////////
     /////fulfillRandomWords////
     //////////////////////////

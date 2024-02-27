@@ -14,7 +14,6 @@ contract MockPriceConverter {
         address priceFeed,
         bytes reason
     );
-    error MockPriceConverter__TotalAmountIsZero(address priceFeed);
 
     //<----------------------------functions---------------------------->
     /**
@@ -22,7 +21,7 @@ contract MockPriceConverter {
      * @return price of specific token with 18 decimals
      * @notice through error if the price feed contract is not availabe on Chainlink
      */
-    function getPrice(address priceFeed) internal view returns (uint256 price) {
+    function getPrice(address priceFeed) public view returns (uint256 price) {
         //https://docs.chain.link/data-feeds/using-data-feeds
         //catching the error if the address passed is not valid
         try AggregatorV3Interface(priceFeed).latestRoundData() returns (
@@ -56,13 +55,8 @@ contract MockPriceConverter {
     function getTotalAmount(
         address priceFeed,
         uint256 quantity
-    ) internal view returns (uint256 totalAmount) {
+    ) public view returns (uint256 totalAmount) {
         uint256 price = getPrice(priceFeed);
-        if (price > 0) {
-            totalAmount = ((price * quantity) / PRECISION);
-        }
-        if (totalAmount == 0) {
-            revert MockPriceConverter__TotalAmountIsZero(priceFeed);
-        }
+        totalAmount = ((price * quantity) / PRECISION);
     }
 }

@@ -64,11 +64,6 @@ library ChainlinkManager {
         uint256 quantity
     ) internal view returns (uint256 totalAmount) {
         uint256 price = getPrice(priceFeed);
-        if (price > 0) {
-            totalAmount = ((price * quantity) / PRECISION);
-        }
-        if (totalAmount == 0) {
-            revert ChainlinkManager__TotalAmountIsZero(priceFeed);
-        }
+        totalAmount = ((price * quantity) / PRECISION);
     }
 }

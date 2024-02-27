@@ -16,7 +16,10 @@ contract DeploySCEngine is Script {
 
     uint256 deployerKey;
 
-    function run() external returns (SCEngine, StableCoin, HelperConfig) {
+    function run()
+        external
+        returns (SCEngine, StableCoin, HelperConfig, MockPriceConverter)
+    {
         HelperConfig helperConfig = new HelperConfig();
         (token, priceFeed, deployerKey) = helperConfig.getActiveNetworkConfig();
         //
@@ -34,6 +37,6 @@ contract DeploySCEngine is Script {
         //
         //
         //
-        return (scEngine, stableCoin, helperConfig);
+        return (scEngine, stableCoin, helperConfig, mockPriceConverter);
     }
 }

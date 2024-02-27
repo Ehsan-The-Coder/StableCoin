@@ -37,11 +37,9 @@ contract HelperConfig is Script {
         view
         returns (NetworkConfig memory networkConfig)
     {
-        // DAI
-        // USDC
         address[] memory tokens = new address[](2);
-        tokens[0] = 0x3e622317f8C93f7328350cF0B56d9eD4C620C5d6;
-        tokens[1] = 0x036CbD53842c5426634e7929541eC2318f3dCF7e;
+        tokens[0] = 0x7f11f79DEA8CE904ed0249a23930f2e59b43a385;
+        tokens[1] = 0x3e622317f8C93f7328350cF0B56d9eD4C620C5d6;
         address[] memory priceFeeds = new address[](2);
         priceFeeds[0] = 0x14866185B1962B63C3Ea9E03Bc1da838bab34C19;
         priceFeeds[1] = 0xA2F78ab2355fe2f984D808B5CeE7FD0A93D5270E;
@@ -58,14 +56,12 @@ contract HelperConfig is Script {
         view
         returns (NetworkConfig memory networkConfig)
     {
-        // DAI
-        // USDC
         address[] memory tokens = new address[](2);
         tokens[0] = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
-        tokens[1] = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+        tokens[1] = 0x111111111117dC0aa78b770fA6A738034120C302;
         address[] memory priceFeeds = new address[](2);
         priceFeeds[0] = 0xAed0c38402a5d19df6E4c03F4E2DceD6e29c1ee9;
-        priceFeeds[1] = 0x8fFfFfd4AfB6115b954Bd326cbe7B4BA576818f6;
+        priceFeeds[1] = 0xc929ad75B72593967DE83E7F7Cda0493458261D9;
 
         networkConfig = NetworkConfig({
             token: tokens,
@@ -78,8 +74,6 @@ contract HelperConfig is Script {
         public
         returns (NetworkConfig memory networkConfig)
     {
-        // DAI
-        // USDC
         address[] memory tokens = new address[](2);
         tokens[0] = deployMockERC20();
         tokens[1] = deployMockERC20();
