@@ -5,6 +5,7 @@ pragma solidity ^0.8.20;
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC20Burnable} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {console} from "forge-std/Script.sol";
 
 contract StableCoin is ERC20, ERC20Burnable, Ownable {
     //<----------------------------state variable---------------------------->
@@ -13,7 +14,7 @@ contract StableCoin is ERC20, ERC20Burnable, Ownable {
     event TokenBurned(address indexed burner, uint256 quantity);
     //<----------------------------custom errors---------------------------->
     error StableCoin__NotZeroAddress();
-    error StableCoin__NotZeroQuantity();
+    error StableCoin__NotZeroValue();
     error StableCoin__NotZeroBalance();
     error StableCoin__BurnQuantityExceedsBalance(
         uint256 quantity,
@@ -21,6 +22,18 @@ contract StableCoin is ERC20, ERC20Burnable, Ownable {
     );
 
     //<----------------------------modifiers---------------------------->
+    modifier isZeroAddress(address _address) {
+        if (_address == address(0)) {
+            revert StableCoin__NotZeroAddress();
+        }
+        _;
+    }
+    modifier isZeroValue(uint256 value) {
+        if (value == 0) {
+            revert StableCoin__NotZeroValue();
+        }
+        _;
+    }
 
     //<----------------------------functions---------------------------->
     //<----------------------------constructor---------------------------->
@@ -31,13 +44,13 @@ contract StableCoin is ERC20, ERC20Burnable, Ownable {
     function mint(
         address to,
         uint256 quantity
-    ) public onlyOwner returns (bool isSuccess) {
-        if (to == address(0)) {
-            revert StableCoin__NotZeroAddress();
-        }
-        if (quantity == 0) {
-            revert StableCoin__NotZeroQuantity();
-        }
+    )
+        public
+        onlyOwner
+        isZeroAddress(to)
+        isZeroValue(quantity)
+        returns (bool isSuccess)
+    {
         _mint(to, quantity);
         emit TokenMinted(to, quantity);
         isSuccess = true;
@@ -45,10 +58,9 @@ contract StableCoin is ERC20, ERC20Burnable, Ownable {
         return isSuccess;
     }
 
-    function burn(uint256 quantity) public override onlyOwner {
-        if (quantity == 0) {
-            revert StableCoin__NotZeroQuantity();
-        }
+    function burn(
+        uint256 quantity
+    ) public override onlyOwner isZeroValue(quantity) {
         uint256 balance = balanceOf(msg.sender);
         if (balance < quantity) {
             revert StableCoin__BurnQuantityExceedsBalance(quantity, balance);

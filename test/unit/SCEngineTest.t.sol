@@ -28,6 +28,8 @@ contract SCEngineTest is Test, Script {
     uint256 private constant PRECISION = 1e18;
     uint256 private constant QUANTITY_TO_DEPOSIT = 500 * PRECISION;
     uint256 private constant QUANTITY_TO_MINT = 100 * PRECISION;
+    uint256 private constant QUANTITY_TO_BURN = 10 * PRECISION;
+
     address[] s_tokens;
     address[] s_priceFeeds;
     address s_stableCoin;
@@ -101,6 +103,39 @@ contract SCEngineTest is Test, Script {
         (s_tokens, s_priceFeeds, ) = helperConfig.getActiveNetworkConfig();
         s_stableCoin = address(stableCoin);
     }
+
+    function burnScMultiple(uint256 quantity) public {
+        for (uint256 userIndex = 0; userIndex < users.length; userIndex++) {
+            address burner = users[userIndex];
+            burnScSingle(burner, address(scEngine), quantity);
+        }
+    }
+
+    function burnScSingle(
+        address burner,
+        address spender,
+        uint256 quantity
+    ) public {
+        uint256 userBalance = scEngine.getMinterMintBalance(burner);
+        uint256 userExpectedBalance = userBalance - quantity;
+
+        uint256 contractBalance = IERC20(stableCoin).balanceOf(address(burner));
+        uint256 contractExpectedBalance = contractBalance - quantity;
+
+        vm.startPrank(burner);
+        IERC20(stableCoin).approve(spender, quantity);
+        scEngine.burnSc(quantity);
+        vm.stopPrank();
+
+        uint256 userActualBalance = scEngine.getMinterMintBalance(burner);
+        uint256 contractActualBalance = IERC20(stableCoin).balanceOf(
+            address(burner)
+        );
+        assert(userExpectedBalance == userActualBalance);
+        assert(contractExpectedBalance == contractActualBalance);
+    }
+
+    function redeemCollateralSingle(address token, uint256 quantity) external {}
 
     function mintAndApproveTokens(
         address token,
@@ -336,7 +371,7 @@ contract SCEngineTest is Test, Script {
     function testUserHealthFactorWhenDepoistAndMintSc() public {
         depositCollateralMultiple();
         mintScMultiple();
-        uint256 userHealthFactor = scEngine.getUserHealthFactor(address(1));
+
         uint256 usersLength = users.length;
         for (uint8 userIndex = 0; userIndex < usersLength; userIndex++) {
             address user = users[userIndex];
@@ -374,7 +409,49 @@ contract SCEngineTest is Test, Script {
             assert(expectedPrice == actualPrice);
         }
     }
+
+    function testGetTokenAmountFromUsd() public view {
+        for (uint256 index = 0; index < s_tokens.length; index++) {
+            address token = s_tokens[index];
+            address priceFeed = s_priceFeeds[index];
+            uint256 price = mockPriceConverter.getPrice(priceFeed);
+            uint256 expectedPrice = (QUANTITY_TO_DEPOSIT *
+                scEngine.getPrecision()) / price;
+
+            uint256 actualPrice = scEngine.getTokenAmountFromUsd(
+                token,
+                QUANTITY_TO_DEPOSIT
+            );
+
+            assert(expectedPrice == actualPrice);
+        }
+    }
+
     ////////////////////////////
-    /////fulfillRandomWords////
+    ///////Burn////////////////
     //////////////////////////
+    function revertIfBurnQuantityIsZero() public {
+        vm.expectRevert(SCEngine.SCEngine__ZeroValue.selector);
+        scEngine.burnSc(0);
+    }
+
+    function revertIfTransferFromFailed() public {
+        vm.expectRevert();
+        scEngine.burnSc(QUANTITY_TO_BURN);
+    }
+
+    function testBurn() external {
+        depositCollateralMultiple();
+        mintScMultiple();
+        burnScMultiple(QUANTITY_TO_BURN);
+    }
+
+    ////////////////////////////
+    ///RedeemCollateralForSc///
+    ///////////////////////////
+    function testRedeemCollarteral() external {
+        depositCollateralMultiple();
+        mintScMultiple();
+        // scEngine.redeemCollateral()
+    }
 }

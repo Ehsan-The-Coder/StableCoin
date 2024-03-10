@@ -17,6 +17,7 @@ contract SCEngine is ReentrancyGuard {
     uint256 private constant LIQUIDATION_PRECISION = 100;
     uint256 private constant MIN_HEALTH_FACTOR = 1e18;
     uint256 private constant PRECISION = 1e18;
+    uint256 private constant LIQUIDATION_BONUS = 10;
 
     mapping(address token => address priceFeed) private s_tokenPriceFeed;
     address[] private s_tokens;
@@ -31,6 +32,12 @@ contract SCEngine is ReentrancyGuard {
         address indexed tokenCollateralAddress,
         uint256 quantity
     );
+    event CollateralRedeemed(
+        address indexed from,
+        address indexed to,
+        address indexed tokenCollateralAddress,
+        uint256 amountCollateral
+    );
     //<----------------------------custom errors---------------------------->
     error SCEngine__LengthOfConstructorValuesNotEqual(
         uint256 tokenLength,
@@ -41,8 +48,11 @@ contract SCEngine is ReentrancyGuard {
     error SCEngine__IdenticalTokenAndPriceFeed();
     error SCEngine__TokenNotListed(address token);
     error SCEngine__TokenTransferFromFailed();
+    error SCEngine__TransferFailed();
     error SCEngine__TokenMintFailed();
     error SCEngine__BreaksHealthFactor(uint256 userHealthFactor);
+    error SCEngine__HealthFactorOk();
+    error SCEngine__HealthFactorNotImproved();
     //<----------------------------modifiers---------------------------->
     modifier notEqualLength(uint256 lengthA, uint256 lengthB) {
         if (lengthA != lengthB) {
@@ -95,8 +105,6 @@ contract SCEngine is ReentrancyGuard {
     }
 
     //<----------------------------external functions---------------------------->
-
-    //<----------------------------public functions---------------------------->
     function depositCollataralAndMintSc(
         address tokenCollateralAddress,
         uint256 quantity,
@@ -105,6 +113,65 @@ contract SCEngine is ReentrancyGuard {
         depositCollataral(tokenCollateralAddress, quantity);
         mintSc(mintQuantity);
     }
+
+    function redeemCollateralForSc(
+        address token,
+        uint256 quantityOfCollateral,
+        uint256 quantityToBurn
+    )
+        external
+        isValueZero(quantityOfCollateral)
+        isValueZero(quantityToBurn)
+        isTokenExisted(token)
+    {
+        _burnSc(quantityToBurn, msg.sender, msg.sender);
+        _redeemCollateral(token, quantityOfCollateral, msg.sender, msg.sender);
+    }
+
+    function redeemCollateral(
+        address token,
+        uint256 quantity
+    ) external isValueZero(quantity) nonReentrant isTokenExisted(token) {
+        _redeemCollateral(token, quantity, msg.sender, msg.sender);
+        _revertIfHealthFactorIsBroken(msg.sender);
+    }
+
+    function burnSc(uint256 quantity) external isValueZero(quantity) {
+        _burnSc(quantity, msg.sender, msg.sender);
+        _revertIfHealthFactorIsBroken(msg.sender); // I don't think this would ever hit...
+    }
+
+    function liquidate(
+        address token,
+        address user,
+        uint256 debtToCover
+    ) external isValueZero(debtToCover) nonReentrant {
+        uint256 startingUserHealthFactor = _healthFactor(user);
+        if (startingUserHealthFactor >= MIN_HEALTH_FACTOR) {
+            revert SCEngine__HealthFactorOk();
+        }
+        uint256 tokenAmountFromDebtCovered = getTokenAmountFromUsd(
+            token,
+            debtToCover
+        );
+        uint256 bonusCollateral = (tokenAmountFromDebtCovered *
+            LIQUIDATION_BONUS) / LIQUIDATION_PRECISION;
+        _redeemCollateral(
+            token,
+            tokenAmountFromDebtCovered + bonusCollateral,
+            user,
+            msg.sender
+        );
+        _burnSc(debtToCover, user, msg.sender);
+
+        uint256 endingUserHealthFactor = _healthFactor(user);
+        if (endingUserHealthFactor <= startingUserHealthFactor) {
+            revert SCEngine__HealthFactorNotImproved();
+        }
+        _revertIfHealthFactorIsBroken(msg.sender);
+    }
+
+    //<----------------------------public functions---------------------------->
 
     function depositCollataral(
         address tokenCollateralAddress,
@@ -141,6 +208,14 @@ contract SCEngine is ReentrancyGuard {
     }
 
     //<----------------------------external/public view/pure functions---------------------------->
+    function getTokenAmountFromUsd(
+        address token,
+        uint256 usdAmountInWei
+    ) public view isTokenExisted(token) returns (uint256) {
+        uint256 price = ChainlinkManager.getPrice(s_tokenPriceFeed[token]);
+        return ((usdAmountInWei * PRECISION) / price);
+    }
+
     function getUserHealthFactor(address user) external view returns (uint256) {
         return _healthFactor(user);
     }
@@ -217,6 +292,39 @@ contract SCEngine is ReentrancyGuard {
     }
 
     //<----------------------------private functions---------------------------->
+    function _redeemCollateral(
+        address tokenCollateralAddress,
+        uint256 quantity,
+        address from,
+        address to
+    ) private {
+        s_collateralDeposited[from][tokenCollateralAddress] -= quantity;
+        emit CollateralRedeemed(from, to, tokenCollateralAddress, quantity);
+        bool success = IERC20(tokenCollateralAddress).transfer(to, quantity);
+        if (!success) {
+            revert SCEngine__TransferFailed();
+        }
+    }
+
+    function _burnSc(
+        uint256 quantity,
+        address onBehalfOf,
+        address scFrom
+    ) private {
+        s_scMinted[onBehalfOf] -= quantity;
+
+        bool success = StableCoin(i_stableCoin).transferFrom(
+            scFrom,
+            address(this),
+            quantity
+        );
+        if (!success) {
+            revert SCEngine__TransferFailed();
+        }
+
+        StableCoin(i_stableCoin).burn(quantity);
+    }
+
     //<----------------------------private view/pure functions---------------------------->
 
     function _healthFactor(address user) private view returns (uint256) {
