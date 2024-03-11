@@ -61,6 +61,12 @@ contract SCEngineTest is Test, Script {
         address indexed tokenCollateralAddress,
         uint256 quantity
     );
+    event CollateralRedeemed(
+        address indexed from,
+        address indexed to,
+        address indexed tokenCollateralAddress,
+        uint256 amountCollateral
+    );
     //<---------------------------------------modifier------------------------------------------>
 
     modifier skipForkChains() {
@@ -135,7 +141,30 @@ contract SCEngineTest is Test, Script {
         assert(contractExpectedBalance == contractActualBalance);
     }
 
-    function redeemCollateralSingle(address token, uint256 quantity) external {}
+    function redeemCollateralSingle(address token, uint256 quantity) external {
+        uint256 UserCollateral = scEngine.getDepositerCollateralBalance(
+            msg.sender,
+            token
+        );
+        uint256 UserExpectedCollateral = UserCollateral - quantity;
+        uint256 userBalance = IERC20(token).balanceOf(msg.sender);
+        uint256 userExpectedBalance = userBalance + quantity;
+        uint256 contractBalance = IERC20(token).balanceOf(address(scEngine));
+        uint256 contractExpectedBalance = contractBalance - quantity;
+
+        uint256 UserActualCollateral = scEngine.getDepositerCollateralBalance(
+            msg.sender,
+            token
+        );
+        uint256 userActualBalance = IERC20(token).balanceOf(msg.sender);
+        uint256 contractActualBalance = IERC20(token).balanceOf(
+            address(scEngine)
+        );
+
+        assert(UserExpectedCollateral == UserActualCollateral);
+        assert(userExpectedBalance == userActualBalance);
+        assert(contractExpectedBalance == contractActualBalance);
+    }
 
     function mintAndApproveTokens(
         address token,
