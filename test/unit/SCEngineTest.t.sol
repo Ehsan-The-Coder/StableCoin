@@ -27,6 +27,7 @@ contract SCEngineTest is Test, Script {
     uint256 private constant MIN_HEALTH_FACTOR = 1e18;
     uint256 private constant PRECISION = 1e18;
     uint256 private constant QUANTITY_TO_DEPOSIT = 500 * PRECISION;
+    uint256 private constant QUANTITY_TO_REDEEM = 200 * PRECISION;
     uint256 private constant QUANTITY_TO_MINT = 100 * PRECISION;
     uint256 private constant QUANTITY_TO_BURN = 10 * PRECISION;
 
@@ -105,12 +106,12 @@ contract SCEngineTest is Test, Script {
         }
     }
 
-    function setValues() public {
+    function setValues() private {
         (s_tokens, s_priceFeeds, ) = helperConfig.getActiveNetworkConfig();
         s_stableCoin = address(stableCoin);
     }
 
-    function burnScMultiple(uint256 quantity) public {
+    function burnScMultiple(uint256 quantity) private {
         for (uint256 userIndex = 0; userIndex < users.length; userIndex++) {
             address burner = users[userIndex];
             burnScSingle(burner, address(scEngine), quantity);
@@ -121,7 +122,7 @@ contract SCEngineTest is Test, Script {
         address burner,
         address spender,
         uint256 quantity
-    ) public {
+    ) private {
         uint256 userBalance = scEngine.getMinterMintBalance(burner);
         uint256 userExpectedBalance = userBalance - quantity;
 
@@ -141,22 +142,45 @@ contract SCEngineTest is Test, Script {
         assert(contractExpectedBalance == contractActualBalance);
     }
 
-    function redeemCollateralSingle(address token, uint256 quantity) external {
+    function redeemCollateralMultiple() private {
+        for (uint256 userIndex = 0; userIndex < users.length; userIndex++) {
+            for (
+                uint256 tokenIndex = 0;
+                tokenIndex < s_tokens.length;
+                tokenIndex++
+            ) {
+                address redeemer = users[userIndex];
+                address token = s_tokens[tokenIndex];
+
+                redeemCollateralSingle(redeemer, token, QUANTITY_TO_REDEEM);
+            }
+        }
+    }
+
+    function redeemCollateralSingle(
+        address redeemer,
+        address token,
+        uint256 quantity
+    ) private {
         uint256 UserCollateral = scEngine.getDepositerCollateralBalance(
-            msg.sender,
+            redeemer,
             token
         );
         uint256 UserExpectedCollateral = UserCollateral - quantity;
-        uint256 userBalance = IERC20(token).balanceOf(msg.sender);
+        uint256 userBalance = IERC20(token).balanceOf(redeemer);
         uint256 userExpectedBalance = userBalance + quantity;
         uint256 contractBalance = IERC20(token).balanceOf(address(scEngine));
         uint256 contractExpectedBalance = contractBalance - quantity;
 
+        vm.startPrank(redeemer);
+        scEngine.redeemCollateral(token, quantity);
+        vm.stopPrank();
+
         uint256 UserActualCollateral = scEngine.getDepositerCollateralBalance(
-            msg.sender,
+            redeemer,
             token
         );
-        uint256 userActualBalance = IERC20(token).balanceOf(msg.sender);
+        uint256 userActualBalance = IERC20(token).balanceOf(redeemer);
         uint256 contractActualBalance = IERC20(token).balanceOf(
             address(scEngine)
         );
@@ -170,19 +194,19 @@ contract SCEngineTest is Test, Script {
         address token,
         address to,
         uint256 quantity
-    ) public {
+    ) private {
         deal(token, to, quantity, false);
         IERC20(token).approve(address(scEngine), quantity);
     }
 
-    function mintScMultiple() public {
+    function mintScMultiple() private {
         for (uint256 userIndex = 0; userIndex < users.length; userIndex++) {
             address minter = users[userIndex];
             mintScSingle(minter);
         }
     }
 
-    function mintScSingle(address minter) public {
+    function mintScSingle(address minter) private {
         uint256 quantity = QUANTITY_TO_MINT;
         uint256 userBalance = scEngine.getMinterMintBalance(minter);
         uint256 userExpectedBalance = userBalance + quantity;
@@ -201,7 +225,7 @@ contract SCEngineTest is Test, Script {
         assert(contractExpectedBalance == contractActualBalance);
     }
 
-    function depositCollateralMultiple() public {
+    function depositCollateralMultiple() private {
         for (uint256 userIndex = 0; userIndex < users.length; userIndex++) {
             for (
                 uint256 tokenIndex = 0;
@@ -215,7 +239,7 @@ contract SCEngineTest is Test, Script {
         }
     }
 
-    function depositCollateralSingle(address depositer, address token) public {
+    function depositCollateralSingle(address depositer, address token) private {
         uint256 quantity = QUANTITY_TO_DEPOSIT;
         uint256 userBalance = scEngine.getDepositerCollateralBalance(
             depositer,
@@ -478,9 +502,55 @@ contract SCEngineTest is Test, Script {
     ////////////////////////////
     ///RedeemCollateralForSc///
     ///////////////////////////
+    function testRedeemCollarteralShouldRevertIfQuantityZero() external {
+        uint256 tokenIndex = 0;
+        address token = s_tokens[tokenIndex];
+
+        uint256 quantity = 0;
+        vm.expectRevert(SCEngine.SCEngine__ZeroValue.selector);
+        scEngine.redeemCollateral(token, quantity);
+    }
+
+    function testRedeemCollarteralShouldRevertIfTokenNotExisted() external {
+        address token = address(0);
+
+        uint256 quantity = QUANTITY_TO_REDEEM;
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                SCEngine.SCEngine__TokenNotListed.selector,
+                token
+            )
+        );
+        scEngine.redeemCollateral(token, quantity);
+    }
+
+    function testRedeemCollarteralShouldRevertIfBreaksHealthFactor() external {
+        depositCollateralMultiple();
+        mintScMultiple();
+        mintScMultiple();
+        mintScMultiple();
+        mintScMultiple();
+        mintScMultiple();
+        mintScMultiple();
+        mintScMultiple();
+        mintScMultiple();
+        mintScMultiple();
+        mintScMultiple();
+        mintScMultiple();
+        mintScMultiple();
+        //expect revert as redeeming same amount of token we deposit but we already minted StableCoin
+        uint256 quantity = QUANTITY_TO_DEPOSIT;
+        uint256 tokenIndex = 0;
+        address token = s_tokens[tokenIndex];
+
+        vm.expectRevert();
+        vm.prank(address(1));
+        scEngine.redeemCollateral(token, quantity);
+    }
+
     function testRedeemCollarteral() external {
         depositCollateralMultiple();
         mintScMultiple();
-        // scEngine.redeemCollateral()
+        redeemCollateralMultiple();
     }
 }
