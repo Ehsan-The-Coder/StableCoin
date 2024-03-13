@@ -368,6 +368,7 @@ contract SCEngine is ReentrancyGuard {
 
     function _revertIfHealthFactorIsBroken(address user) private view {
         uint256 userHealthFactor = _healthFactor(user);
+        console.log("userHealthFactor", userHealthFactor);
         if (userHealthFactor < MIN_HEALTH_FACTOR) {
             revert SCEngine__BreaksHealthFactor(userHealthFactor);
         }

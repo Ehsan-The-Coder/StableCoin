@@ -173,6 +173,8 @@ contract SCEngineTest is Test, Script {
         uint256 contractExpectedBalance = contractBalance - quantity;
 
         vm.startPrank(redeemer);
+        vm.expectEmit(true, true, true, false, address(scEngine));
+        emit CollateralRedeemed(redeemer, redeemer, token, quantity);
         scEngine.redeemCollateral(token, quantity);
         vm.stopPrank();
 
@@ -513,7 +515,6 @@ contract SCEngineTest is Test, Script {
 
     function testRedeemCollarteralShouldRevertIfTokenNotExisted() external {
         address token = address(0);
-
         uint256 quantity = QUANTITY_TO_REDEEM;
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -527,25 +528,21 @@ contract SCEngineTest is Test, Script {
     function testRedeemCollarteralShouldRevertIfBreaksHealthFactor() external {
         depositCollateralMultiple();
         mintScMultiple();
-        mintScMultiple();
-        mintScMultiple();
-        mintScMultiple();
-        mintScMultiple();
-        mintScMultiple();
-        mintScMultiple();
-        mintScMultiple();
-        mintScMultiple();
-        mintScMultiple();
-        mintScMultiple();
-        mintScMultiple();
-        //expect revert as redeeming same amount of token we deposit but we already minted StableCoin
         uint256 quantity = QUANTITY_TO_DEPOSIT;
-        uint256 tokenIndex = 0;
-        address token = s_tokens[tokenIndex];
-
-        vm.expectRevert();
-        vm.prank(address(1));
-        scEngine.redeemCollateral(token, quantity);
+        for (uint256 userIndex = 0; userIndex < users.length; userIndex++) {
+            address redeemer = users[userIndex];
+            address token = s_tokens[0];
+            vm.startPrank(redeemer);
+            //this transaction is not going to be revert
+            //as user have enough collateral in the reserve from the 2nd token
+            scEngine.redeemCollateral(token, quantity);
+            token = s_tokens[1];
+            vm.expectRevert();
+            //this calls must revert as token 1 collateral already redeemed and
+            // this is going to break the health factor
+            scEngine.redeemCollateral(token, quantity);
+            vm.stopPrank();
+        }
     }
 
     function testRedeemCollarteral() external {
