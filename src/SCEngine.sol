@@ -125,7 +125,6 @@ contract SCEngine is ReentrancyGuard {
     //<----------------------------functions---------------------------->
     //<----------------------------constructor---------------------------->
     /**
-     * @title SCEngine Constructor
      * @dev Initializes the SCEngine contract with a list of tokens and their corresponding Chainlink price feeds, as well as the address of the StableCoin contract.
      * @param token An array of addresses representing the tokens to be supported by the SCEngine.
      * @param priceFeed An array of addresses representing the Chainlink price feeds for the corresponding tokens.
@@ -170,7 +169,6 @@ contract SCEngine is ReentrancyGuard {
 
     //<----------------------------external functions---------------------------->
     /**
-     * @title depositCollataralAndMintSc
      * @dev Allows a user to deposit collateral and mint StableCoin (SC) in a single transaction.
      * @param tokenCollateralAddress The address of the collateral token to be deposited.
      * @param quantity The amount of collateral to be deposited.
@@ -195,7 +193,6 @@ contract SCEngine is ReentrancyGuard {
     }
 
     /**
-     * @title redeemCollateralForSc
      * @dev Allows a user to redeem collateral for StableCoin (SC) in a single transaction.
      * @param token The address of the collateral token to be redeemed.
      * @param quantityOfCollateral The amount of collateral to be redeemed.
@@ -225,7 +222,6 @@ contract SCEngine is ReentrancyGuard {
     }
 
     /**
-     * @title redeemCollateral
      * @dev Allows a user to redeem collateral from the system.
      * @param token The address of the collateral token to be redeemed.
      * @param quantity The amount of collateral to be redeemed.
@@ -247,7 +243,6 @@ contract SCEngine is ReentrancyGuard {
     }
 
     /**
-     * @title burnSc
      * @dev Allows a user to burn StableCoin (SC) tokens.
      * @param quantity The amount of StableCoin (SC) to be burned.
      *
@@ -263,7 +258,6 @@ contract SCEngine is ReentrancyGuard {
     }
 
     /**
-     * @title liquidate
      * @dev Allows a user to liquidate collateral to cover debt, with a 10% bonus for the liquidator.
      * @param token The address of the collateral token to be liquidated.
      * @param user The address of the user whose collateral is being liquidated.
@@ -325,7 +319,6 @@ contract SCEngine is ReentrancyGuard {
 
     //<----------------------------public functions---------------------------->
     /**
-     * @title depositCollataral
      * @dev Allows a user to deposit collateral into the system.
      * @param tokenCollateralAddress The address of the collateral token to be deposited.
      * @param quantity The amount of collateral to be deposited.
@@ -361,7 +354,6 @@ contract SCEngine is ReentrancyGuard {
     }
 
     /**
-     * @title mintSc
      * @dev Allows a user to mint StableCoin (SC) tokens.
      * @param quantity The amount of StableCoin (SC) to be minted.
      *
@@ -386,7 +378,6 @@ contract SCEngine is ReentrancyGuard {
 
     //<----------------------------external/public view/pure functions---------------------------->
     /**
-     * @title getTokenAmountFromUsd
      * @dev Converts a given amount in USD to the equivalent amount in a specified collateral token.
      * @param token The address of the collateral token for which the conversion is needed.
      * @param usdAmountInWei The amount in USD to be converted, represented in Wei (the smallest unit of Ether).
@@ -499,7 +490,6 @@ contract SCEngine is ReentrancyGuard {
 
     //<----------------------------private functions---------------------------->
     /**
-     * @title _redeemCollateral
      * @dev Private function to redeem collateral from the system.
      * @param tokenCollateralAddress The address of the collateral token to be redeemed.
      * @param quantity The amount of collateral to be redeemed.
@@ -525,7 +515,6 @@ contract SCEngine is ReentrancyGuard {
     }
 
     /**
-     * @title _burnSc
      * @dev Private function to burn StableCoin (SC) tokens.
      * @param quantity The amount of StableCoin (SC) to be burned.
      * @param onBehalfOf The address of the user on whose behalf the SC tokens are being burned.
@@ -555,14 +544,13 @@ contract SCEngine is ReentrancyGuard {
     //<----------------------------private view/pure functions---------------------------->
 
     /**
-     * @title _healthFactor
      * @dev Private function to calculate the health factor of a user.
      * @param user The address of the user for whom the health factor is being calculated.
      *
      * @notice The health factor is a measure of the user's collateralization level, indicating how much collateral they have deposited relative to the amount of StableCoin (SC) they have minted.
      * @notice A higher health factor indicates a more secure position, with the minimum health factor threshold representing a safe level of collateralization.
      *
-     * @return Returns the health factor of the user, which is a ratio of the user's collateral value in USD to the value of the SC tokens they have minted.
+     *Returns the health factor of the user, which is a ratio of the user's collateral value in USD to the value of the SC tokens they have minted.
      */
     function _healthFactor(address user) private view returns (uint256) {
         (
@@ -573,14 +561,14 @@ contract SCEngine is ReentrancyGuard {
     }
 
     /**
-     * @title _getAccountInformation
      * @dev Private function to retrieve account information, including the total amount of StableCoin (SC) minted and the total value of the user's collateral in USD.
      * @param user The address of the user for whom the account information is being retrieved.
      *
      * @notice This function calculates the total SC minted by the user and the total value of their collateral in USD.
      * @notice It iterates over all supported collateral tokens to sum up the collateral value.
      *
-     * @return Returns a tuple containing the total amount of SC minted by the user and the total value of their collateral in USD.
+     * @return totalScMinted The total amount of SC minted by the user.
+     * @return collateralValueInUsd The total value of the user's collateral in USD.
      */
     function _getAccountInformation(
         address user
@@ -604,7 +592,6 @@ contract SCEngine is ReentrancyGuard {
     }
 
     /**
-     * @title _calculateHealthFactor
      * @dev Private function to calculate the health factor based on the total amount of StableCoin (SC) minted and the collateral value in USD.
      * @param totalScMinted The total amount of StableCoin (SC) minted by the user.
      * @param collateralValueInUsd The total value of the user's collateral in USD.
@@ -625,7 +612,6 @@ contract SCEngine is ReentrancyGuard {
     }
 
     /**
-     * @title _revertIfHealthFactorIsBroken
      * @dev Private function to check if the user's health factor is below the minimum health factor threshold.
      * @param user The address of the user whose health factor is being checked.
      *

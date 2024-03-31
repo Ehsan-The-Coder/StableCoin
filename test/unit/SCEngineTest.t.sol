@@ -582,7 +582,7 @@ contract SCEngineTest is Test, Script {
     ///////////////////////////////
     function _getUserTotalDepositorValueInUsd(
         address user
-    ) private returns (uint256 collateralValueInUsd) {
+    ) private view returns (uint256 collateralValueInUsd) {
         address token;
         address priceFeed;
         uint256 quantity;
@@ -935,7 +935,7 @@ contract SCEngineTest is Test, Script {
         }
     }
 
-    function _getTokenQuantity(address token) private returns (uint256) {
+    function _getTokenQuantity(address token) private view returns (uint256) {
         uint256 tokenAmount = scEngine.getTokenAmountFromUsd(
             token,
             QUANTITY_TO_LIQUIDATE

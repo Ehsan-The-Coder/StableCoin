@@ -26,10 +26,6 @@ import {console} from "forge-std/Script.sol";
  */
 
 contract StableCoin is ERC20, ERC20Burnable, Ownable {
-    //<----------------------------state variable---------------------------->
-    //<----------------------------events---------------------------->
-    event TokenMinted(address indexed minter, uint256 quantity);
-    event TokenBurned(address indexed burner, uint256 quantity);
     //<----------------------------custom errors---------------------------->
     error StableCoin__NotZeroAddress();
     error StableCoin__NotZeroValue();
@@ -57,7 +53,6 @@ contract StableCoin is ERC20, ERC20Burnable, Ownable {
     //<----------------------------constructor---------------------------->
     constructor() ERC20("StableCoin", "SC") Ownable(msg.sender) {}
 
-    //<----------------------------external functions---------------------------->
     //<----------------------------public functions---------------------------->
     function mint(
         address to,
@@ -70,7 +65,6 @@ contract StableCoin is ERC20, ERC20Burnable, Ownable {
         returns (bool isSuccess)
     {
         _mint(to, quantity);
-        emit TokenMinted(to, quantity);
         isSuccess = true;
 
         return isSuccess;
@@ -84,12 +78,5 @@ contract StableCoin is ERC20, ERC20Burnable, Ownable {
             revert StableCoin__BurnQuantityExceedsBalance(quantity, balance);
         }
         super.burn(quantity);
-
-        emit TokenBurned(msg.sender, quantity);
     }
-    //<----------------------------external/public view/pure functions---------------------------->
-    //<----------------------------internal functions---------------------------->
-    //<----------------------------internal view/pure functions---------------------------->
-    //<----------------------------private functions---------------------------->
-    //<----------------------------private view/pure functions---------------------------->
 }
