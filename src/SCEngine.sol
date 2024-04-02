@@ -572,11 +572,9 @@ contract SCEngine is ReentrancyGuard {
      */
     function _getAccountInformation(
         address user
-    )
-        private
-        view
-        returns (uint256 totalScMinted, uint256 collateralValueInUsd)
-    {
+    ) private view returns (uint256, uint256) {
+        uint256 collateralValueInUsd;
+        uint256 totalScMinted;
         totalScMinted = s_scMinted[user];
         for (uint256 index = 0; index < s_tokens.length; index++) {
             address token = s_tokens[index];

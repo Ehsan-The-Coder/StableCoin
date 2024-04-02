@@ -57,17 +57,10 @@ contract StableCoin is ERC20, ERC20Burnable, Ownable {
     function mint(
         address to,
         uint256 quantity
-    )
-        public
-        onlyOwner
-        isZeroAddress(to)
-        isZeroValue(quantity)
-        returns (bool isSuccess)
-    {
+    ) public onlyOwner isZeroAddress(to) isZeroValue(quantity) returns (bool) {
         _mint(to, quantity);
-        isSuccess = true;
 
-        return isSuccess;
+        return true;
     }
 
     function burn(
