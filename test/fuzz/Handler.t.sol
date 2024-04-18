@@ -14,6 +14,7 @@ contract Handler is Test {
     SCEngine scEngine;
     StableCoin stableCoin;
     uint256 MAX_DEPOSIT_QUANTITY = type(uint96).max;
+    address[] msgSenders;
 
     constructor(SCEngine _scEngine, StableCoin _stableCoin) {
         scEngine = _scEngine;
@@ -29,6 +30,8 @@ contract Handler is Test {
             collateralSeed
         );
         address msgSender = msg.sender;
+        msgSenders.push(msgSender);
+        //
         vm.startPrank(msgSender);
         _mintAndApproveTokens(
             collateralAddress,
@@ -40,6 +43,60 @@ contract Handler is Test {
         vm.stopPrank();
     }
 
+    function redeemCollateral(
+        uint256 collateralSeed,
+        uint256 collateralQuantity
+    ) public {
+        address msgSender = _getUserFromSeed(collateralSeed);
+        address collateralAddress = _getCollateralAddressFromSeed(
+            collateralSeed
+        );
+
+        (uint256 totalScMinted, uint256 collateralValueInUsd) = scEngine
+            .getAccountInformation(msgSender);
+        console.log("collateralValueInUsd", collateralValueInUsd);
+        int256 ramainingValueInUSD = (int256(collateralValueInUsd) / 2) -
+            int256(totalScMinted);
+        if (ramainingValueInUSD < 1) {
+            return;
+        }
+        console.log("ramainingValueInUSD", uint256(ramainingValueInUSD));
+        uint256 maxTokenToRedeem = scEngine.getTokenAmountFromUsd(
+            collateralAddress,
+            uint256(ramainingValueInUSD)
+        );
+        console.log("maxTokenToRedeem", maxTokenToRedeem);
+        if (maxTokenToRedeem < 105) {
+            return;
+        } else {
+            maxTokenToRedeem -= 100;
+        }
+        collateralQuantity = bound(collateralQuantity, 1, maxTokenToRedeem);
+        vm.startPrank(msgSender);
+        console.log(
+            "scEngine.redeemCollateral(collateralAddress, collateralQuantity);"
+        );
+        scEngine.redeemCollateral(collateralAddress, collateralQuantity);
+        vm.stopPrank();
+    }
+
+    function mintSC(uint256 seed, uint256 quantity) public {
+        address msgSender = _getUserFromSeed(seed);
+        (uint256 totalScMinted, uint256 collateralValueInUsd) = scEngine
+            .getAccountInformation(msgSender);
+
+        int256 maxScToMint = (int256(collateralValueInUsd) / 2) -
+            int256(totalScMinted);
+        if (maxScToMint < 2) {
+            return;
+        }
+        quantity = bound(quantity, 1, uint256(maxScToMint));
+        vm.startPrank(msgSender);
+        scEngine.mintSc(quantity);
+        vm.stopPrank();
+    }
+
+    //<----------------------------------------------Helper Functions----------------------------------------->
     function _mintAndApproveTokens(
         address token,
         address user,
@@ -56,5 +113,16 @@ contract Handler is Test {
         address[] memory tokens = scEngine.getTokens();
         uint256 tokenIndex = collateralSeed % tokens.length;
         token = tokens[tokenIndex];
+    }
+
+    function _getUserFromSeed(
+        uint256 userSeed
+    ) private view returns (address msgSender) {
+        if (msgSenders.length == 0) {
+            msgSender = address(1);
+        } else {
+            uint256 userIndex = userSeed % msgSenders.length;
+            msgSender = msgSenders[userIndex];
+        }
     }
 }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.18;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, console} from "forge-std/Test.sol";
 import {StdInvariant} from "forge-std/StdInvariant.sol";
 import {SCEngine} from "../../src/SCEngine.sol";
 import {StableCoin} from "../../src/StableCoin.sol";
@@ -40,6 +40,14 @@ contract Invariants is StdInvariant, Test {
             return;
         } else {
             assert(totalCollateralValueInUsd > totalStableCoinsMinted);
+        }
+        if (totalStableCoinsMinted != 0) {
+            console.log(
+                "<------------------------------------------------------------------------------>"
+            );
+
+            console.log("totalStableCoinsMinted", totalStableCoinsMinted);
+            console.log("totalCollateralValueInUsd", totalCollateralValueInUsd);
         }
     }
 
