@@ -22,7 +22,7 @@ This project is a DeFi application that enables users to mint, burn, and manage 
 - script: Contains deployment scripts for the smart contracts & mocks contracts for testing purpose.
 - test: Contains unit and fuzz tests for the project.
 
-<pre>
+<pre style="line-height: 1;">
   ├── lib
   ├── script>
   │  &emsp; └── deploy
