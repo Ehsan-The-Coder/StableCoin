@@ -5,7 +5,7 @@ libs = ["lib"]
 remappings=["@chainlink/contracts/=lib/chainlink-brownie-contracts/contracts/","@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/"]
 
 [invariant]
-runs=128
+runs=500
 depth=128
 fail_on_revert=true
 

@@ -54,18 +54,27 @@ contract Handler is Test {
 
         (uint256 totalScMinted, uint256 collateralValueInUsd) = scEngine
             .getAccountInformation(msgSender);
-        console.log("collateralValueInUsd", collateralValueInUsd);
+
         int256 ramainingValueInUSD = (int256(collateralValueInUsd) / 2) -
             int256(totalScMinted);
         if (ramainingValueInUSD < 1) {
             return;
         }
-        console.log("ramainingValueInUSD", uint256(ramainingValueInUSD));
+
         uint256 maxTokenToRedeem = scEngine.getTokenAmountFromUsd(
             collateralAddress,
             uint256(ramainingValueInUSD)
         );
-        console.log("maxTokenToRedeem", maxTokenToRedeem);
+        uint256 userBalance = scEngine.getDepositerCollateralBalance(
+            msgSender,
+            collateralAddress
+        );
+        if (userBalance == 0) {
+            return;
+        }
+        if (maxTokenToRedeem > userBalance) {
+            maxTokenToRedeem = userBalance;
+        }
         if (maxTokenToRedeem < 105) {
             return;
         } else {
@@ -73,9 +82,7 @@ contract Handler is Test {
         }
         collateralQuantity = bound(collateralQuantity, 1, maxTokenToRedeem);
         vm.startPrank(msgSender);
-        console.log(
-            "scEngine.redeemCollateral(collateralAddress, collateralQuantity);"
-        );
+
         scEngine.redeemCollateral(collateralAddress, collateralQuantity);
         vm.stopPrank();
     }
@@ -93,6 +100,19 @@ contract Handler is Test {
         quantity = bound(quantity, 1, uint256(maxScToMint));
         vm.startPrank(msgSender);
         scEngine.mintSc(quantity);
+        vm.stopPrank();
+    }
+
+    function burnSc(uint256 seed, uint256 quantity) public {
+        address msgSender = _getUserFromSeed(seed);
+        uint256 userBalance = scEngine.getMinterMintBalance(msgSender);
+        if (userBalance < 2) {
+            return;
+        }
+        quantity = bound(quantity, 1, userBalance);
+        vm.startPrank(msgSender);
+        IERC20(stableCoin).approve(address(scEngine), quantity);
+        scEngine.burnSc(quantity);
         vm.stopPrank();
     }
 

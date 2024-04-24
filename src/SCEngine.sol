@@ -238,7 +238,6 @@ contract SCEngine is ReentrancyGuard {
         address token,
         uint256 quantity
     ) external isValueZero(quantity) nonReentrant isTokenExisted(token) {
-        console.log("inside redeemCollateral");
         _redeemCollateral(token, quantity, msg.sender, msg.sender);
         _revertIfHealthFactorIsBroken(msg.sender);
     }
@@ -294,7 +293,6 @@ contract SCEngine is ReentrancyGuard {
         // This is done by converting the debt amount from USD to the equivalent amount in the collateral token.
         // The conversion rate is obtained from the Chainlink price feed associated with the collateral token.
         // The result is stored in the variable `tokenAmountFromDebtCovered`, which represents the amount of collateral token required to cover the debt.
-        console.log("before getTokenAmountFromUsd(token,debtToCover);");
         uint256 tokenAmountFromDebtCovered = getTokenAmountFromUsd(
             token,
             debtToCover
@@ -406,14 +404,6 @@ contract SCEngine is ReentrancyGuard {
         return _healthFactor(user);
     }
 
-    // Calculates the health factor of a user.
-    function calculateUserHealthFactor(
-        uint256 totalScMinted,
-        uint256 collateralValueInUsd
-    ) external pure returns (uint256) {
-        return _calculateHealthFactor(totalScMinted, collateralValueInUsd);
-    }
-
     // Retrieves account information.
     function getAccountInformation(
         address user
@@ -423,6 +413,14 @@ contract SCEngine is ReentrancyGuard {
         returns (uint256 totalScMinted, uint256 collateralValueInUsd)
     {
         return _getAccountInformation(user);
+    }
+
+    // Calculates the health factor of a user.
+    function calculateUserHealthFactor(
+        uint256 totalScMinted,
+        uint256 collateralValueInUsd
+    ) external pure returns (uint256) {
+        return _calculateHealthFactor(totalScMinted, collateralValueInUsd);
     }
 
     // Returns the StableCoin contract address.

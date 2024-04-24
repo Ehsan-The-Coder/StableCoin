@@ -46,9 +46,39 @@ contract Invariants is StdInvariant, Test {
                 "<------------------------------------------------------------------------------>"
             );
 
-            console.log("totalStableCoinsMinted", totalStableCoinsMinted);
+            console.log("totalStableCoinsMinted   ", totalStableCoinsMinted);
             console.log("totalCollateralValueInUsd", totalCollateralValueInUsd);
         }
+    }
+
+    function invariant_publicViewFunctionsShouldNeverRevert() public view {
+        uint256 usdAmountInWei = 3203434;
+        uint256 quantity = 9034254465;
+        uint256 tLength = s_tokens.length;
+        address token;
+        address priceFeed;
+
+        for (uint256 tIndex = 0; tIndex < tLength; tIndex++) {
+            token = s_tokens[tIndex];
+            priceFeed = s_priceFeeds[tIndex];
+            scEngine.getTokenAmountFromUsd(token, usdAmountInWei);
+        }
+
+        scEngine.getUserHealthFactor(msg.sender);
+        (uint256 totalScMinted, uint256 collateralValueInUsd) = scEngine
+            .getAccountInformation(msg.sender);
+        scEngine.calculateUserHealthFactor(totalScMinted, collateralValueInUsd);
+        scEngine.getStableCoin();
+        scEngine.getTokens();
+        scEngine.getPriceFeed(token);
+        scEngine.getPrice(priceFeed);
+        scEngine.getTotalAmount(priceFeed, quantity);
+        scEngine.getLiquidationThreshold();
+        scEngine.getMinimumHealthFactor();
+        scEngine.getPrecision();
+        scEngine.getLiquidationPrecision();
+        scEngine.getDepositerCollateralBalance(msg.sender, token);
+        scEngine.getMinterMintBalance(msg.sender);
     }
 
     function _getTotalCollateralValueInUsd()
